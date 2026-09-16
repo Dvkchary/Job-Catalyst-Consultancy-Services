@@ -1,0 +1,57 @@
+# ==============================================================================
+# JobCatalyst AI - Prometheus Global Metrics Collection Configuration
+# ==============================================================================
+
+global:
+  scrape_interval: 15s     # How frequently to scrape targets
+  evaluation_interval: 15s # How frequently to evaluate alerting rules
+  scrape_timeout: 10s      # Timeout before marking scrape as failed
+
+  # Attach standard labels to all collected metrics
+  external_labels:
+    monitor: 'jobcatalyst-telemetry-grid'
+
+# Alertmanager configuration (Integration Ready)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            # - "alertmanager:9093"
+
+# Load rules files once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "alert_rules.yml"
+
+scrape_configs:
+  # 1. Prometheus Internal Metrics
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 2. FastAPI Backend API Gateway Metrics (instrumented via prometheus-fastapi-instrumentator)
+  - job_name: 'jobcatalyst-backend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend:8000']
+
+  # 3. Background Worker Process Metrics (Celery flower or exporter)
+  - job_name: 'jobcatalyst-worker'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['worker:8000'] # Metrics endpoint on worker container
+
+  # 4. Nginx Reverse Proxy Traffic metrics
+  - job_name: 'jobcatalyst-nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+
+  # 5. Database Performance Metrics (Postgres Exporter)
+  - job_name: 'jobcatalyst-postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # 6. Cache Load Metrics (Redis Exporter)
+  - job_name: 'jobcatalyst-redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']

@@ -1,0 +1,55 @@
+# ==============================================================================
+# JobCatalyst AI - Production Worker Dockerfile (Celery / Background Tasks)
+# ==============================================================================
+
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/wheels /app/wheels
+COPY --from=builder /app/requirements.txt .
+RUN pip install --no-cache /app/wheels/*
+
+# Install Celery and redis in worker (in case not in requirements.txt)
+RUN pip install --no-cache-dir celery==5.4.0 redis==5.0.4
+
+COPY . .
+
+# Create a non-privileged system user for container hardening
+RUN groupadd -g 10001 appgroup && \
+    useradd -r -u 10001 -g appgroup -d /app -s /sbin/nologin appuser && \
+    chown -R appuser:appgroup /app
+
+# Switch to the non-root user
+USER appuser
+
+# Celery Worker command. In production, this can be customized by environment variables
+# or run-time docker command override.
+CMD ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "-c", "4"]

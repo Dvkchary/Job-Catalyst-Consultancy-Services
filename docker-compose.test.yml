@@ -1,0 +1,68 @@
+# ==============================================================================
+# JobCatalyst AI - Automated Testing Docker Compose Configuration
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # Isolated Testing DB
+  test_db:
+    image: postgres:15-alpine
+    container_name: jobcatalyst_test_db
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: jobcatalyst_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d jobcatalyst_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test_net
+
+  # Isolated Testing Cache
+  test_redis:
+    image: redis:7-alpine
+    container_name: jobcatalyst_test_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test_net
+
+  # Test Runner (Compiles backend, executes tests, and exits with status code)
+  test_runner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: jobcatalyst_test_runner
+    environment:
+      - ENVIRONMENT=testing
+      - POSTGRES_HOST=test_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_DB=jobcatalyst_test
+      - REDIS_HOST=test_redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=TESTING_JWT_SECRET_KEY_12345
+    depends_on:
+      test_db:
+        condition: service_healthy
+      test_redis:
+        condition: service_healthy
+    # Run migrations then run pytest with coverage report
+    command: >
+      bash -c "
+        alembic upgrade head &&
+        pytest --cov=app --cov-report=term-missing --cov-fail-under=80 tests/
+      "
+    networks:
+      - test_net
+
+networks:
+  test_net:
+    driver: bridge

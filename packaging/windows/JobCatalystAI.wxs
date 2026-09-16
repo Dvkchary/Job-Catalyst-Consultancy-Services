@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <!-- Unique Product Code and Upgrade Code for Enterprise Deployment -->
+  <Product Id="*" 
+           Name="JobCatalyst AI" 
+           Language="1033" 
+           Version="1.0.0" 
+           Manufacturer="JobCatalyst Corporation" 
+           UpgradeCode="6F9E1234-A7B8-43C9-BD87-1A2B3C4D5E6F">
+    
+    <Package InstallerVersion="500" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="Enterprise Production MSI Installer for JobCatalyst AI"
+             Comments="Bypasses typical setup prompts for Active Directory / GPO orchestration." />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed. Setup will now exit." 
+                  AllowSameVersionUpgrades="yes" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Directory Layout Structure -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="JobCatalystAI">
+          <Directory Id="BackendFolder" Name="backend" />
+          <Directory Id="FrontendFolder" Name="frontend" />
+          <Directory Id="NginxFolder" Name="nginx" />
+          <Directory Id="ScriptsFolder" Name="scripts" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="JobCatalyst AI"/>
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <!-- Component Declarations -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Primary App Bootstrapper -->
+      <Component Id="LauncherComponent" Guid="6F9E5678-C1D2-4E3F-BF4A-5A6B7C8D9E0F" Win64="yes">
+        <File Id="LauncherExe" Source="..\..\dist-release\windows\JobCatalystLauncher.exe" KeyPath="yes" />
+        
+        <!-- Start Menu Shortcut -->
+        <Shortcut Id="ApplicationStartMenuShortcut" 
+                  Name="JobCatalyst AI" 
+                  Description="Launches the JobCatalyst AI service and dashboard"
+                  Directory="ApplicationProgramsFolder" 
+                  WorkingDirectory="INSTALLFOLDER" 
+                  Icon="AppIcon.ico" 
+                  Advertise="yes" />
+
+        <!-- Desktop Shortcut -->
+        <Shortcut Id="ApplicationDesktopShortcut" 
+                  Name="JobCatalyst AI" 
+                  Description="Launches the JobCatalyst AI service and dashboard"
+                  Directory="DesktopFolder" 
+                  WorkingDirectory="INSTALLFOLDER" 
+                  Icon="AppIcon.ico" 
+                  Advertise="yes" />
+      </Component>
+
+      <!-- Primary configurations -->
+      <Component Id="ComposeConfigComponent" Guid="6F9E9012-D3E4-4F5A-B01C-6D7E8F9A0B1C" Win64="yes">
+        <File Id="DockerComposeProd" Source="..\..\docker-compose.prod.yml" KeyPath="yes" />
+      </Component>
+
+      <Component Id="EnvTemplateComponent" Guid="6F9E0123-E4F5-4A6B-BC2D-7E8F9A0B1C2D" Win64="yes">
+        <File Id="EnvExample" Source="..\..\.env.example" Name=".env" KeyPath="yes" />
+      </Component>
+
+    </ComponentGroup>
+
+    <!-- Shortcut cleanup configuration during uninstallation -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcutMenuCleanup" Guid="6F9E3456-F5A6-4B7C-CD3D-8E9F0A1B2C3D">
+        <RemoveFolder Id="CleanUpShortCutMenu" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\JobCatalystAI" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Icon Resources -->
+    <Icon Id="AppIcon.ico" SourceFile="..\..\assets\favicon.ico"/>
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <!-- Standard UI Configuration for Interactive Installs -->
+    <UIRef Id="WixUI_Minimal" />
+
+    <!-- Feature Definitions -->
+    <Feature Id="ProductFeature" Title="JobCatalyst AI Production Node" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcutMenuCleanup" />
+    </Feature>
+
+  </Product>
+</Wix>

@@ -1,0 +1,21 @@
+=========================================================================
+==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
+==  Version 2.0, in this case for the JobCatalyst AI distribution.     ==
+=========================================================================
+
+JobCatalyst AI
+Copyright 2026 JobCatalyst Corporation
+
+This product includes software developed by JobCatalyst Corporation
+(https://jobcatalyst.ai/).
+
+This product includes numerous third-party dependencies, including:
+- FastAPI (MIT License) - https://fastapi.tiangolo.com/
+- React & React-DOM (MIT License) - https://react.dev/
+- Vite (MIT License) - https://vite.dev/
+- Celery (BSD License) - https://docs.celeryq.dev/
+- Redis (BSD License) - https://redis.io/
+- PostgreSQL (PostgreSQL License) - https://www.postgresql.org/
+- Tailwind CSS (MIT License) - https://tailwindcss.com/
+- Lucide React Icons (ISC License) - https://lucide.dev/
+- Motion (MIT License) - https://motion.dev/

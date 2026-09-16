@@ -1,0 +1,43 @@
+name: Infrastructure Enterprise Pipeline
+
+on:
+  push:
+    paths:
+      - 'docker-compose*.yml'
+      - 'infrastructure/**'
+      - 'nginx/**'
+  pull_request:
+    paths:
+      - 'docker-compose*.yml'
+      - 'infrastructure/**'
+      - 'nginx/**'
+
+permissions:
+  contents: read
+
+jobs:
+  infrastructure-validation:
+    name: Validate Infrastructure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.prod.yml config > /dev/null
+          docker compose -f docker-compose.test.yml config > /dev/null
+          echo "Docker Compose configurations are valid."
+
+      - name: Validate Nginx Configuration
+        run: |
+          docker run --rm -v $(pwd)/nginx:/etc/nginx/conf.d nginx:alpine nginx -t -c /etc/nginx/nginx.conf
+
+      - name: Test Environment Startup
+        run: |
+          docker compose -f docker-compose.test.yml up -d
+          sleep 10
+          docker compose -f docker-compose.test.yml ps
+          docker compose -f docker-compose.test.yml down -v

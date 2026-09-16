@@ -1,0 +1,87 @@
+name: Enterprise CD Pipeline (Deployment)
+
+on:
+  workflow_run:
+    workflows: ["Docker Enterprise Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      action:
+        description: 'Action'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - rollback
+      version_tag:
+        description: 'Image tag to deploy/rollback'
+        required: true
+        default: 'latest'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Continuous Delivery Orchestrator
+    # Only run automatically if the triggered workflow succeeded, or if manually triggered.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target_env || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Determine Variables
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "ENV=${{ github.event.inputs.target_env }}" >> $GITHUB_OUTPUT
+            echo "ACTION=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+            echo "TAG=${{ github.event.inputs.version_tag }}" >> $GITHUB_OUTPUT
+          else
+            if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+              echo "ENV=production" >> $GITHUB_OUTPUT
+            else
+              echo "ENV=staging" >> $GITHUB_OUTPUT
+            fi
+            echo "ACTION=deploy" >> $GITHUB_OUTPUT
+            echo "TAG=sha-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Execute Blue-Green Deployment Script
+        run: |
+          TARGET_ENV="${{ steps.vars.outputs.ENV }}"
+          TAG="${{ steps.vars.outputs.TAG }}"
+          ACTION="${{ steps.vars.outputs.ACTION }}"
+          
+          echo "Executing $ACTION for $TARGET_ENV with tag $TAG..."
+          ssh -o StrictHostKeyChecking=no deployer@$TARGET_ENV.jobcatalyst.ai \
+            "bash -s" < ./infrastructure/scripts/deploy-blue-green.sh $TARGET_ENV $TAG $ACTION
+
+      - name: Post-Deployment Smoke Tests
+        if: ${{ steps.vars.outputs.ACTION == 'deploy' }}
+        run: |
+          echo "Running smoke tests against $TARGET_ENV..."
+          # E.g. ping the health endpoint
+          curl -f https://$TARGET_ENV.jobcatalyst.ai/api/v1/health || exit 1

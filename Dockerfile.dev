@@ -1,0 +1,22 @@
+# ==============================================================================
+# JobCatalyst AI - Development Frontend Dockerfile
+# ==============================================================================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Enable layer caching for npm packages
+COPY package*.json ./
+RUN npm install
+
+# Source code is mounted as a volume in docker-compose.dev.yml
+COPY . .
+
+# Expose the designated local Vite port (configured as port 3000)
+EXPOSE 3000
+
+ENV DISABLE_HMR=true
+
+# Start Vite dev server on port 3000
+CMD ["npm", "run", "dev"]

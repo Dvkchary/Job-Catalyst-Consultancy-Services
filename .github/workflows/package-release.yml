@@ -1,0 +1,123 @@
+# ==============================================================================
+# JobCatalyst AI - Automated Release Packaging and Distribution CI/CD Pipeline
+# ==============================================================================
+# This GitHub Actions workflow automates the commercial distribution pipeline.
+# It triggers on release tagging (e.g., v1.0.0-rc1) to compile the Windows exe/msi,
+# build/push Docker images, compile release tarballs, compute SHA-256 sums,
+# and publish compiled binaries directly as official GitHub Release artifacts.
+
+name: Commercial Release & Distribution Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # Job 1: Build & Verify Production Docker Containers
+  docker_build_push:
+    name: Build & Publish Enterprise Docker Containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Backend Production Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            jobcatalyst/backend:latest
+            jobcatalyst/backend:${{ github.ref_name }}
+
+      - name: Build and Push Frontend Production Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            jobcatalyst/frontend:latest
+            jobcatalyst/frontend:${{ github.ref_name }}
+
+  # Job 2: Build Windows Installer (Cross-compiled or using Windows VM)
+  windows_packaging:
+    name: Compile Windows EXE & MSI Installers
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+
+      - name: Run Windows Packaging PowerShell Bootstrapper
+        shell: pwsh
+        run: |
+          cd packaging/windows
+          ./build-windows-installer.ps1 -Version "${{ github.ref_name }}"
+
+      - name: Upload Windows Setup Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsInstaller
+          path: dist-release/windows/
+
+  # Job 3: Assemble Release Packages & Generate Checksums
+  assemble_packages:
+    name: Assemble Dist Packages & Checksums
+    runs-on: ubuntu-latest
+    needs: [windows_packaging]
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Create Release directory structure
+        run: mkdir -p dist-release/packages dist-release/windows
+
+      - name: Download Windows Installer Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: WindowsInstaller
+          path: dist-release/windows/
+
+      - name: Run Commercial Tarball Bundler
+        run: |
+          chmod +x packaging/release/package-releases.sh
+          ./packaging/release/package-releases.sh
+
+      - name: Run Checksum Integrity Verifier
+        run: |
+          chmod +x packaging/verification/verify-packages.sh
+          ./packaging/verification/verify-packages.sh
+
+      - name: Create Official GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist-release/packages/*.tar.gz
+            dist-release/packages/SHA256SUMS
+            dist-release/windows/JobCatalystAI-Setup.exe
+            dist-release/windows/JobCatalystAI.msi
+          draft: false
+          prerelease: false
+          body_path: docs/RELEASE_NOTES_RC1.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

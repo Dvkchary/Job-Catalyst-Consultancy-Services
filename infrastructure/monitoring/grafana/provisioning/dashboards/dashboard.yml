@@ -1,0 +1,15 @@
+# ==============================================================================
+# JobCatalyst AI - Grafana Auto-Provisioning Dashboards Configuration
+# ==============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'JobCatalyst System Dashboards'
+    orgId: 1
+    folder: 'Enterprise Services'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

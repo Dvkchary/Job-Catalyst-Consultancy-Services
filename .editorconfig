@@ -1,0 +1,25 @@
+# EditorConfig: http://EditorConfig.org
+
+root = true
+
+# Global settings for all files
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Frontend-specific overrides (TypeScript, JavaScript, CSS, HTML, JSON)
+[*.{ts,tsx,js,jsx,css,html,json}]
+indent_size = 2
+
+# Configuration files
+[*.{yaml,yml,toml}]
+indent_size = 2
+
+# Markdown documentation
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 4

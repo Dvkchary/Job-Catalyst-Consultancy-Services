@@ -1,0 +1,68 @@
+name: Frontend Enterprise Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'index.html'
+  pull_request:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'index.html'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  frontend-checks:
+    name: Frontend CI (Lint, Test, Build)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Type Check
+        run: npx tsc --noEmit
+
+      - name: Run ESLint
+        # Optional: if you have eslint setup. Fallback to just running tsc if not.
+        run: npm run lint || npx eslint src --ext .ts,.tsx
+
+      - name: Run Vitest & Coverage
+        run: npm run test:coverage || npx vitest run --coverage
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/clover.xml
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Verify Production Build
+        run: npm run build

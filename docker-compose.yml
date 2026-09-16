@@ -1,0 +1,168 @@
+# ==============================================================================
+# JobCatalyst AI - Local Development Docker Compose Configuration
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # Database Service (PostgreSQL)
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: jobcatalyst_dev_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: jobcatalyst
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobcatalyst_net
+
+  # Cache & Message Broker (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: jobcatalyst_dev_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobcatalyst_net
+
+  # Backend FastAPI API Gateway
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: jobcatalyst_dev_backend
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_HOST=postgres_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespassword
+      - POSTGRES_DB=jobcatalyst
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=DEVELOPMENT_JWT_SECRET_KEY_REPLACE_ME_1234
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - jobcatalyst_net
+
+  # Background Queue Worker (Celery)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: jobcatalyst_dev_worker
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_HOST=postgres_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespassword
+      - POSTGRES_DB=jobcatalyst
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=DEVELOPMENT_JWT_SECRET_KEY_REPLACE_ME_1234
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - jobcatalyst_net
+
+  # Frontend Single Page Application (React / Vite)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: jobcatalyst_dev_frontend
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - jobcatalyst_net
+
+  # Nginx Gateway Routing (Ingress Proxy)
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: jobcatalyst_dev_nginx
+    volumes:
+      - ./nginx/conf.d/default.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - jobcatalyst_net
+
+  # Monitoring (Prometheus Collector)
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: jobcatalyst_dev_prometheus
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - jobcatalyst_net
+
+  # Monitoring UI (Grafana Dashboard)
+  grafana:
+    image: grafana/grafana:10.0.3
+    container_name: jobcatalyst_dev_grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infrastructure/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro
+    networks:
+      - jobcatalyst_net
+
+networks:
+  jobcatalyst_net:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  grafana_dev_data:
+    driver: local
