@@ -74,7 +74,7 @@ jobs:
           ./build-windows-installer.ps1 -Version "${{ github.ref_name }}"
 
       - name: Upload Windows Setup Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: WindowsInstaller
           path: dist-release/windows/
