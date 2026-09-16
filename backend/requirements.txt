@@ -19,7 +19,7 @@ PyJWT==2.8.0
 pyotp==2.9.0
 
 # Database & Migration (SQLAlchemy 2.0 & Alembic)
-SQLAlchemy==2.0.31
+SQLAlchemy==2.0.52
 alembic==1.13.2
 asyncpg==0.29.0
 greenlet==3.0.3
