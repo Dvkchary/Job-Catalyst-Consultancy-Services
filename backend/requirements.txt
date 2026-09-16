@@ -13,7 +13,7 @@ python-dotenv==1.0.1
 
 # Security & CORS
 cryptography==42.0.8
-python-multipart==0.0.9
+python-multipart==0.0.32
 argon2-cffi==23.1.0
 PyJWT==2.8.0
 pyotp==2.9.0
