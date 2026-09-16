@@ -56,7 +56,7 @@ jobs:
         run: npm run test:coverage || npx vitest run --coverage
 
       - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           file: ./coverage/clover.xml
           flags: frontend
